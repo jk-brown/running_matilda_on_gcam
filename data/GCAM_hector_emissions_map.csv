@@ -1,0 +1,47 @@
+ghg,agg.gas,unit.conv,hector.name,hector.units
+CO2,CO2,1.00E-03,ffi_emissions,Pg C/yr
+CO2NetLandUse,CO2NetLandUse,1.00E-03,NBP_constrain,Pg C/yr
+CH4,CH4,1.00E+00,CH4_emissions,Tg CH4
+CH4_AGR,CH4,1.00E+00,CH4_emissions,Tg CH4
+CH4_AWB,CH4,1.00E+00,CH4_emissions,Tg CH4
+CO,CO,1.00E+00,CO_emissions,Tg CO
+CO_AGR,CO,1.00E+00,CO_emissions,Tg CO
+CO_AWB,CO,1.00E+00,CO_emissions,Tg CO
+N2O,N2O,6.36E-01,N2O_emissions,Tg N
+N2O_AGR,N2O,6.36E-01,N2O_emissions,Tg N
+N2O_AWB,N2O,6.36E-01,N2O_emissions,Tg N
+NOx,NOx,3.04E-01,NOX_emissions,Tg N
+NOx_AGR,NOx,3.04E-01,NOX_emissions,Tg N
+NOx_AWB,NOx,3.04E-01,NOX_emissions,Tg N
+SO2_1,SO2tot,5.00E+02,SO2_emissions,Gg S
+SO2_2,SO2tot,5.00E+02,SO2_emissions,Gg S
+SO2_3,SO2tot,5.00E+02,SO2_emissions,Gg S
+SO2_4,SO2tot,5.00E+02,SO2_emissions,Gg S
+SO2_1_AWB,SO2tot,5.00E+02,SO2_emissions,Gg S
+SO2_2_AWB,SO2tot,5.00E+02,SO2_emissions,Gg S
+SO2_3_AWB,SO2tot,5.00E+02,SO2_emissions,Gg S
+SO2_4_AWB,SO2tot,5.00E+02,SO2_emissions,Gg S
+CF4,CF4,1.00E+00,CF4_emissions,Gg
+C2F6,C2F6,1.00E+00,C2F6_emissions,Gg
+SF6,SF6,1.00E+00,SF6_emissions,Gg
+HFC125,HFC125,1.00E+00,HFC125_emissions,Gg
+HFC134a,HFC134a,1.00E+00,HFC134a_emissions,Gg
+HFC245fa,HFC245fa,1.00E+00,HFC245fa_emissions,Gg
+HFC23,HFC23,1.00E+00,HFC23_emissions,Gg
+HFC32,HFC32,1.00E+00,HFC32_emissions,Gg
+HFC43,HFC134a,1.15E+00,HFC134a_emissions,Gg
+HFC143a,HFC143a,1.00E+00,HFC143a_emissions,Gg
+HFC152a,HFC245fa,1.20E-01,HFC245fa_emissions,Gg
+HFC227ea,HFC227ea,1.00E+00,HFC227ea_emissions,Gg
+HFC236fa,HFC143a,2.19E+00,HFC143a_emissions,Gg
+HFC365mfc,HFC245fa,7.71E-01,HFC245fa_emissions,Gg
+NMVOC,NMVOCs,1.00E+00,NMVOC_emissions,Tg NMVOC
+NMVOC_AGR,NMVOCs,1.00E+00,NMVOC_emissions,Tg NMVOC
+NMVOC_AWB,NMVOCs,1.00E+00,NMVOC_emissions,Tg NMVOC
+BC,BC,1.00E+00,BC_emissions,Tg
+BC_AWB,BC,1.00E+00,BC_emissions,Tg
+OC,OC,1.00E+00,OC_emissions,Tg
+OC_AWB,OC,1.00E+00,OC_emissions,Tg
+NH3,NH3,1.00E+00,NH3_emissions,Tg
+NH3_AGR,NH3,1.00E+00,NH3_emissions,Tg
+NH3_AWB,NH3,1.00E+00,NH3_emissions,Tg
