@@ -4,6 +4,7 @@ library(rgcam)
 library(tidyverse)
 library(data.table)
 library(assertthat)
+library(hector)
 
 # * 1.1 Loading helper functions and reading in mapping data --------------
 
@@ -66,7 +67,7 @@ get_gcam_emissions <- function(dat_file) {
   expected_emissions <- c("H2", "H2_AWB", "PM10", "PM2.5", "CO2_FUG")
   assertthat::assert_that(all(no_matches %in% expected_emissions), msg = "unexpected emissions not being passed to Hector.")
 
-  # We need to convert the GCAM emissions to Hector emissions (we use the merged mapping data for this ;D ) 
+  # We need to convert the GCAM emissions to Hector emissions (we use the merged mapping data for this) 
   gcam_emissions_map$converted_value <- gcam_emissions_map[ , list(value * unit.conv)]
   
   # Halocarbons can be aggregated into a single halocarbon category -- I think this line of code does that (from Kalyns code)
@@ -109,6 +110,57 @@ get_gcam_emissions <- function(dat_file) {
 
 gcam_emissions_df <- get_gcam_emissions("data/gcam_emissions.dat")
 
-# 4  Building ini from gcam emissions -------------------------------------
+write.csv(gcam_emissions_df, "data/gcam_emissions.csv")
 
+# 4. Run Hector with the GCAM set up & emissions! -- SEE Kalyn script for help -----------------------------------------
+use_gcam_emissions <- function(ini_path, emissions_df, 
+                               out_vars = c(GMST(), RF_TOTAL(), CONCENTRATIONS_CO2())){
+  
+  # There should only be one scenario per emissions data frame. 
+  assert_that(length(unique(emissions_df$scenario)) == 1)
+  # TODO check to make sure that all the required emissions are included? 
+  # TODO add a check that makes sure all the required columns are included in emissions_df? 
+  
+  # Set up the Hector core
+  core <- newcore(ini_path, name = unique(emissions_df$scenario))
+  setvar(core = core, 
+         dates = emissions_df$year, 
+         var = emissions_df$variable, 
+         values = emissions_df$value, 
+         unit = emissions_df$units)
+  reset(core)
+  
+  # The below TODO is relevant fro me because I have LUC emissions, but need to format it and I want to see if this works first.
+  # TODO this should be dropped when the dacccs & luc stuff is implemented in GCAM & in the query.
+  luc_emissions <- data.frame(year = unique(emissions_df$year), 
+                              var = LUC_EMISSIONS(), 
+                              values = .5, 
+                              unit = getunits(FFI_EMISSIONS()))
+  setvar(core = core, 
+         dates = 2005:2100, 
+         var = luc_emissions$var, 
+         values = 10, 
+         unit = getunits(FFI_EMISSIONS()))
+  reset(core)
+  
+  luc_uptake <- data.frame(year = 2005:2100,
+                           var = LUC_UPTAKE(), 
+                           values = 0, 
+                           unit = getunits(FFI_EMISSIONS()))
+  setvar(core = core, 
+         dates = 2005:2100,
+         var = luc_uptake$year, 
+         values = 0, 
+         unit = getunits(FFI_EMISSIONS()))
+  reset(core)
+  
+  # why the fuck is this still not running??? 
+  reset(core)
+  run(core, runtodate = 2050)
+  out <- fetchvars(core = core, dates = 1900:2050, vars = out_vars)
+  return(out)
+  
+}
 
+hector_gcam_driven <- use_gcam_emissions(ini_path = "data/gcam_emissions.ini", 
+                                         emissions_df = gcam_emissions_df)
