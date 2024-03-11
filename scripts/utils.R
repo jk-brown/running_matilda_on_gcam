@@ -85,13 +85,19 @@ get_luc_emissions <- function(dat_file) {
   
   # create rows for years not in gcam data
   annual_luc <- global_luc %>% 
-    complete(year = 1975:2100, nesting(scenario, variable, units), fill = list(value = NA)) %>% 
-    filter(year >2004)
+    # use complete() to get complete years in the df and fill with NAs
+    complete(year = 1975:2100, 
+             nesting(scenario, variable, units), 
+             fill = list(value = NA)) %>% 
+    # only interested in 2005 -- before 2005 Hector uses gcam emissions? -- is that right?
+    filter(year > 2004)
     
+  # compute new interpolated values
   new_vals <- zoo::na.approx(annual_luc$value, annual_luc$year)
+  # Add interpolated values into the df
   annual_luc$value <- new_vals
   
   return(annual_luc)
 }
 
-test <- get_luc_emissions("data/gcam_emissions.dat")
+luc_emissions <- get_luc_emissions("data/gcam_emissions.dat")

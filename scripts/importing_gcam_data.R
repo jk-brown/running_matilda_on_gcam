@@ -47,7 +47,7 @@ get_gcam_emissions <- function(dat_file) {
   assertthat::assert_that(file.exists(dat_file))
   gcam_res <- loadProject(dat_file)
   
-  # format gcam results into a data frame
+  # pull out the emissions data from the dat_file
   gcam_df <- gcam_res$GCAM$`all emissions by region`
   
   # aggregate region emissions to get global totals
@@ -67,7 +67,7 @@ get_gcam_emissions <- function(dat_file) {
   expected_emissions <- c("H2", "H2_AWB", "PM10", "PM2.5", "CO2_FUG")
   assertthat::assert_that(all(no_matches %in% expected_emissions), msg = "unexpected emissions not being passed to Hector.")
 
-  # We need to convert the GCAM emissions to Hector emissions (we use the merged mapping data for this) 
+  # We need to convert the GCAM emissions to Hector emissions (we use the merged mapping data for this ;D ) 
   gcam_emissions_map$converted_value <- gcam_emissions_map[ , list(value * unit.conv)]
   
   # Halocarbons can be aggregated into a single halocarbon category -- I think this line of code does that (from Kalyns code)
@@ -109,7 +109,6 @@ get_gcam_emissions <- function(dat_file) {
 }
 
 gcam_emissions_df <- get_gcam_emissions("data/gcam_emissions.dat")
-
 write.csv(gcam_emissions_df, "data/gcam_emissions.csv")
 
 # 4. Run Hector with the GCAM set up & emissions! -- SEE Kalyn script for help -----------------------------------------
@@ -148,8 +147,8 @@ use_gcam_emissions <- function(ini_path, emissions_df,
                            values = 0, 
                            unit = getunits(FFI_EMISSIONS()))
   setvar(core = core, 
-         dates = 2005:2100,
-         var = luc_uptake$year, 
+         dates = luc_uptake$year,
+         var = LUC_UPTAKE(), 
          values = 0, 
          unit = getunits(FFI_EMISSIONS()))
   reset(core)
@@ -157,10 +156,10 @@ use_gcam_emissions <- function(ini_path, emissions_df,
   # why the fuck is this still not running??? 
   reset(core)
   run(core, runtodate = 2050)
-  out <- fetchvars(core = core, dates = 1900:2050, vars = out_vars)
+  out <- fetchvars(core = core, dates = 2005:2050, vars = out_vars)
   return(out)
   
 }
 
-hector_gcam_driven <- use_gcam_emissions(ini_path = "data/gcam_emissions.ini", 
+hector_gcam_driven <- use_gcam_emissions(ini_path = "data/emissions_input.ini", 
                                          emissions_df = gcam_emissions_df)
