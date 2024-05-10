@@ -1,10 +1,17 @@
+# remotes::install_github("jgcri/rgcam", build_vignettes = T)
+library(rgcam)
+library(tidyverse)
+library(data.table)
+library(assertthat)
+library(hector)
+
 # loading in a dataframe used to make and .ini file
-ini_data <- read.csv("data/ssp119_emiss-constraints_rf.csv")
+ini_data <- read.csv("data/ssp119_emiss-constraints_rf.csv", stringsAsFactors = F)
 
 # create a vector of uniique emissions names from the gcam_emissions data frame
 emission_names <- unique(gcam_emissions_df$variable)
 
-# Loop thourgh each emissions name and update values in ini_data with emissions
+# Loop through each emissions name and update values in ini_data with emissions
 # from gcam_emissions
 convert_ini <- function(ini_data, hector_emissions_data) {
   
@@ -31,12 +38,12 @@ convert_ini <- function(ini_data, hector_emissions_data) {
       for (i in seq_along(years_h_emissions)) {
         year <- years_h_emissions[i]
         
-        # find the corresponding date in df1
+        # find the corresponding date in ini_data
         ini_date <- which(ini_data$Date == year)
         
-        # if the year exists in df1, update the value
+        # if the year exists in ini_data, update the value
         if(length(ini_date) > 0) {
-          ini_data[ini_date, emission_in_ini] <- values_h_emissions[i]
+          ini_update[ini_date, emission_in_ini] <- values_h_emissions[i]
         }
       }
     }
@@ -47,8 +54,8 @@ convert_ini <- function(ini_data, hector_emissions_data) {
 }
 
 # run the function
-ini_update <- convert_ini(ini_data, gcam_emissions_df)
-write.csv(ini_update, "data/emissions_input.csv")
+ini_update <- convert_ini(ini_data, hector_emissions_data)
+write.csv(ini_update, "data/emissions_input.csv", row.names = F)
 
 ## New function to convert luc emissions data into hector inputs.
 ## Much of this function is based on Kalyn's code for converting GCAM
@@ -100,4 +107,4 @@ get_luc_emissions <- function(dat_file) {
   return(annual_luc)
 }
 
-luc_emissions <- get_luc_emissions("data/gcam_emissions.dat")
+luc_emissions <- get_luc_emissions("data/gcam_emissions.dat", row.names = F)

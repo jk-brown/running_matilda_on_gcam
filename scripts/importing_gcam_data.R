@@ -67,7 +67,7 @@ get_gcam_emissions <- function(dat_file) {
   expected_emissions <- c("H2", "H2_AWB", "PM10", "PM2.5", "CO2_FUG")
   assertthat::assert_that(all(no_matches %in% expected_emissions), msg = "unexpected emissions not being passed to Hector.")
 
-  # We need to convert the GCAM emissions to Hector emissions (we use the merged mapping data for this ;D ) 
+  # We need to convert the GCAM emissions to Hector emissions (we use the merged mapping data for this) 
   gcam_emissions_map$converted_value <- gcam_emissions_map[ , list(value * unit.conv)]
   
   # Halocarbons can be aggregated into a single halocarbon category -- I think this line of code does that (from Kalyns code)
@@ -76,7 +76,7 @@ get_gcam_emissions <- function(dat_file) {
   # Drop the expected NAs 
   d <- na.omit(gcam_inputs_for_hector)
   
-  # Error check -- will add later
+  # Error check here -- will add later
 
   # The expected years of data we want are from 2005-2100, before 2005 Hector is using GCAM inputs
   expected_years <- data.table(year = 2005:2100)
@@ -89,6 +89,7 @@ get_gcam_emissions <- function(dat_file) {
   df_NA <- d[df_with_all_yrs, on = names(df_with_all_yrs), nomatch = NA]
 
   df_NA
+  
   # Replace the NA emissions with linearly interpolated values
   df_list <- split(
     x = df_NA,
@@ -108,8 +109,8 @@ get_gcam_emissions <- function(dat_file) {
    out
 }
 
-gcam_emissions_df <- get_gcam_emissions("data/gcam_emissions.dat")
-write.csv(gcam_emissions_df, "data/gcam_emissions.csv")
+hector_emissions_data <- get_gcam_emissions("data/gcam_emissions.dat")
+write.csv(hector_emissions_data, "data/gcam_emissions.csv", row.names = F)
 
 # 4. Run Hector with the GCAM set up & emissions! -- SEE Kalyn script for help -----------------------------------------
 use_gcam_emissions <- function(ini_path, emissions_df, 
@@ -162,4 +163,4 @@ use_gcam_emissions <- function(ini_path, emissions_df,
 }
 
 hector_gcam_driven <- use_gcam_emissions(ini_path = "data/emissions_input.ini", 
-                                         emissions_df = gcam_emissions_df)
+                                         emissions_df = hector_emissions_data)
