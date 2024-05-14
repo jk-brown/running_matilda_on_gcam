@@ -234,17 +234,20 @@ write_emissions_constraint_file <- function(hector_emissions_path) {
 
 
 
+# Using the functions -----------------------------------------------------
+
 hector_emissions <- get_hector_emissions("data/gcam_emissions.dat")
 hector_luc_emissions <- get_luc_emissions("data/gcam_emissions.dat")
 full_hector_emissions <- rbind(hector_emissions, hector_luc_emissions)
 
 emissions_constraints <- get_emissions_constraints(full_hector_emissions)
 
-write.csv(emissions_constraints, "data/new_emissions_constraint.csv", quote = FALSE, row.names = FALSE)
+write.csv(emissions_constraints, "data/new_hector_emissions.csv", quote = FALSE, row.names = FALSE)
 
-create_emissions_constraint_file("data/new_emissions_constraint.csv")
+write_emissions_constraint_file("data/new_hector_emissions.csv")
 
 
+## Editing .ini file
 
 # readLines of the old emissions path (ini file)
 old_emissions_ini <- readLines("data/hector_ssp119.ini")
@@ -262,7 +265,7 @@ new_emissions_ini <- gsub("ssp119",
 writeLines(new_emissions_ini, "data/new_emissions_constraint.ini")
 
 
-
+## Test run and Plotting results
 
 # read in the new ini file and run hector with it 
 ini_file <- "data/new_emissions_constraint.ini" # update to whatever name of new file
@@ -291,3 +294,4 @@ new_emissions +
     aes(x = year, y = value), 
     color = "red") +
   facet_wrap(~variable, scales = "free")
+
