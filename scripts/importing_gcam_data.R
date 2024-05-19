@@ -1,5 +1,5 @@
 # 1 Loading packages ------------------------------------------------------
-# remotes::install_github("jgcri/rgcam", build_vignettes = T)
+# remotes::install_github("jgcri/rgcam")
 library(rgcam)
 library(tidyverse)
 library(data.table)
@@ -110,7 +110,7 @@ get_gcam_emissions <- function(dat_file) {
 }
 
 hector_emissions_data <- get_gcam_emissions("data/gcam_emissions.dat")
-write.csv(hector_emissions_data, "data/gcam_emissions.csv", row.names = F)
+write.csv(hector_emissions_data, "data/gcam_emissions.csv", quote = FALSE)
 
 # 4. Run Hector with the GCAM set up & emissions! -- SEE Kalyn script for help -----------------------------------------
 use_gcam_emissions <- function(ini_path, emissions_df, 
