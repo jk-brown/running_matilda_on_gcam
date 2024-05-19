@@ -7,7 +7,7 @@ library(tidyverse)
 library(data.table)
 library(assertthat)
 library(hector)
-
+library(matilda)
 
 # 2 Helper functions -------------------------------------------------------
 
@@ -49,7 +49,7 @@ get_hector_emissions <- function(gcam_emissions_file){
                                 FUN = sum)
   
   # get emissions mapping information
-  emissions_map <- read.csv("data/GCAM_hector_emissions_map.csv") 
+  emissions_map <- read.csv("workflow/data/GCAM_hector_emissions_map.csv") 
   
   # merge emissions_map with global_emissions
   gcam_emissions_map <- merge(global_emissions, emissions_map, by = "ghg", all.x = TRUE) # all.x = T ensures NAs are added where ghg in global_emissions is not in emissions_map
@@ -114,8 +114,6 @@ get_hector_emissions <- function(gcam_emissions_file){
   return(hector_emissions)
 }
 
-
-
 # 4 Function converting GCAM LUC emissions to Hector LUC emissions --------
 ## New function to convert luc emissions data into hector inputs.
 ## Function is based on GCAM Land C code and Kalyns code.
@@ -144,6 +142,7 @@ get_luc_emissions <- function(gcam_emissions_file) {
     ungroup()
   
   # Expected years for the Hector luc_emissions will be from 2005:2100
+  # wait...am I not using this anywhere?
   expected_years <- 2005:2100
   
   # create rows for years not in gcam data
@@ -153,7 +152,7 @@ get_luc_emissions <- function(gcam_emissions_file) {
              fill = list(value = NA)) %>% 
     filter(year > 2004) %>% 
     # only interested in 2005 -- before 2005 Hector uses gcam emissions?
-    # TODO: get confirmation about filtering in line 155
+    # TODO: get confirmation about filtering in line 152
     mutate(value = ifelse(is.na(value), 
                           approx(year, value, xout = year, rule = 2)$y,
                           value)) %>% 
@@ -172,7 +171,7 @@ get_emissions_constraints <- function(hector_emissions_data) {
   
   # load in ini_data -- this will be moot once this set of functions is a package
   # TODO: This should be package data
-  ini_data <- read.csv("data/ssp119_emiss-constraints_rf.csv", stringsAsFactors = F, skip = 5)
+  ini_data <- read.csv("workflow/data/ssp119_emiss-constraints_rf.csv", stringsAsFactors = F, skip = 5)
   
   # create a vector of unique emissions names from the hector emissions data 
   emission_names <- unique(hector_emissions_data$variable)
@@ -217,7 +216,7 @@ get_emissions_constraints <- function(hector_emissions_data) {
 write_emissions_constraint_file <- function(hector_emissions_path) {
   
   # read the first five lines of the original emissions constrain data
-  header <- readLines("data/ssp119_emiss-constraints_rf.csv", n = 5)
+  header <- readLines("workflow/data/ssp119_emiss-constraints_rf.csv", n = 5)
   
   # readLines of the new emissions constraints (only arg in this function, should be csv)
   new_emission_data <- readLines(hector_emissions_path)
@@ -229,32 +228,31 @@ write_emissions_constraint_file <- function(hector_emissions_path) {
   new_emission_data <- gsub("ssp119 from rcmip", "emissions from gcam run", new_emission_data)
   
   # write the new lines and save
-  writeLines(new_emission_data, "data/new_emissions_constraint.csv")
+  writeLines(new_emission_data, "workflow/data/new_emissions_constraint.csv")
 }
 
+# 7 Using the functions and editing ini -----------------------------------------------------
 
-
-# Using the functions -----------------------------------------------------
-
-hector_emissions <- get_hector_emissions("data/gcam_emissions.dat")
-hector_luc_emissions <- get_luc_emissions("data/gcam_emissions.dat")
+hector_emissions <- get_hector_emissions("workflow/data/gcam_emissions.dat")
+hector_luc_emissions <- get_luc_emissions("workflow/data/gcam_emissions.dat")
 full_hector_emissions <- rbind(hector_emissions, hector_luc_emissions)
 
 emissions_constraints <- get_emissions_constraints(full_hector_emissions)
 
-write.csv(emissions_constraints, "data/new_hector_emissions.csv", quote = FALSE, row.names = FALSE)
+write.csv(emissions_constraints, "workflow/data/new_hector_emissions.csv", quote = FALSE, row.names = FALSE)
 
-write_emissions_constraint_file("data/new_hector_emissions.csv")
+write_emissions_constraint_file("workflow/data/new_hector_emissions.csv")
 
 
-## Editing .ini file
+# TODO write a function that can automate this
+## Editing ini file
 
 # readLines of the old emissions path (ini file)
-old_emissions_ini <- readLines("data/hector_ssp119.ini")
+old_emissions_ini <- readLines("workflow/data/hector_ssp119.ini")
 
 # substitute emissions path in old ini with new emissions path
 new_emissions_ini <- gsub("csv:tables/ssp119_emiss-constraints_rf\\.csv", 
-                          "csv:data/new_emissions_constraint.csv", 
+                          "csv:workflow/data/new_emissions_constraint.csv", 
                           old_emissions_ini)
 
 new_emissions_ini <- gsub("ssp119", 
@@ -262,36 +260,6 @@ new_emissions_ini <- gsub("ssp119",
                           new_emissions_ini)
 
 # write lines for the new emissions ini
-writeLines(new_emissions_ini, "data/new_emissions_constraint.ini")
+writeLines(new_emissions_ini, "workflow/data/new_emissions_constraint.ini")
 
-
-## Test run and Plotting results
-
-# read in the new ini file and run hector with it 
-ini_file <- "data/new_emissions_constraint.ini" # update to whatever name of new file
-core <- hector::newcore(ini_file)
-hector::run(core, runtodate = 2100) #gcam_emissions.csv file only goes to 2005
-out <- fetchvars(core, 1750:2100)
-head(out)
-reset(core)
-
-ini_ssp119 <- system.file("input/hector_ssp119.ini", package = "hector")
-core2 <- hector::newcore(ini_ssp119)
-hector::run(core2, runtodate = 2100)
-out2 <- fetchvars(core2, 1750:2100)
-head(out2)
-
-new_emissions <- 
-  ggplot() + 
-  geom_line(data = out, 
-            aes(x = year, y = value),
-            color = "blue") +
-  facet_wrap(~variable, scales = "free")
-new_emissions
-new_emissions +
-  geom_line(
-    data = out2, 
-    aes(x = year, y = value), 
-    color = "red") +
-  facet_wrap(~variable, scales = "free")
 
