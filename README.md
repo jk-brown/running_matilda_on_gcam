@@ -2,7 +2,7 @@
  Getting GCAM output to run in Matilda
  
 ## Scripts 
-  Contains scripts from Kalyn's work.
+  Contains scripts from Kalyn's work. and maybe a scrap sheet from Joe learning?
   
 ## Workflow
   - utils.R has code for writing functions.
