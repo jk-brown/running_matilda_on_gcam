@@ -213,7 +213,15 @@ get_emissions_constraints <- function(hector_emissions_data) {
 
 # 6 Function editing input document (ini) -------------------------------------
 
-write_emissions_constraint_file <- function(hector_emissions_path) {
+
+## TODO if this will be a new package I would probably add an original emissions constraint file to the 
+write_emissions_constraint_file <- function(hector_emissions_path,
+                                            old_emissions_constraint,
+                                            new_name = "gcam_emissions",
+                                            directory) {
+  
+  # Check that the hector emissions file exist
+  assertthat::assert_that(file.exists(hector_emissions_path), msg = "Hector emissions file does not exist.")
   
   # read the first five lines of the original emissions constrain data
   header <- readLines("workflow/data/ssp119_emiss-constraints_rf.csv", n = 5)
@@ -227,39 +235,84 @@ write_emissions_constraint_file <- function(hector_emissions_path) {
   # change first line to new emissions information 
   new_emission_data <- gsub("ssp119 from rcmip", "emissions from gcam run", new_emission_data)
   
+  # check if output directory exists
+  assert_that(dir.exists(directory), msg = "Output directory does not exist.")
+   
   # write the new lines and save
-  writeLines(new_emission_data, "workflow/data/new_emissions_constraint.csv")
+  output_file <- file.path(directory, paste0(new_name, ".csv"))
+  writeLines(new_emission_data, output_file)
 }
 
-# 7 Using the functions and editing ini -----------------------------------------------------
+# 8 Function to write input file ----------------------------------------
 
-hector_emissions <- get_hector_emissions("workflow/data/gcam_emissions.dat")
-hector_luc_emissions <- get_luc_emissions("workflow/data/gcam_emissions.dat")
-full_hector_emissions <- rbind(hector_emissions, hector_luc_emissions)
+## the goal here is for the args to be the path of the new emissions constraint file -- anything else?
+## The idea is to take the file for the new emissions constraint and use it to change the original emissions input file.
 
-emissions_constraints <- get_emissions_constraints(full_hector_emissions)
+write_input_file <- function(emissions_constraint_file, 
+                             old_input_file = system.file("input/hector_ssp119.ini", package = "hector"),
+                             new_name = "gcam_emissions", 
+                             directory) {
+  
+  # check if file exists
+  assertthat::assert_that(file.exists(emissions_constraint_file), 
+                          msg = "The emissions constraints file specified does not exist.")
+  
+  # readLines of the old emissions file
+  old_emissions_file <- readLines(old_input_file)
+  
+  # substitute old emissions constraint path to new emissions constraint path
+  new_emissions_file <- gsub("csv:tables/ssp119_emiss-constraints_rf.csv", 
+                             paste0("csv:", emissions_constraint_file), 
+                             old_emissions_file)
+  new_emissions_file <- gsub("ssp119",
+                             new_name, 
+                             new_emissions_file)
+  
+  # check if the output directory exists
+  ## TODO should the function create a directory here if the user doesn't supply one?
+  assertthat::assert_that(dir.exists(directory), msg = "Output directory does not exist.")
+  
+  # write lines for the new emissions ini
+  output_file <- file.path(directory, paste0(new_name, ".ini"))
+  writeLines(new_emissions_file, output_file)
+}
 
-write.csv(emissions_constraints, "workflow/data/new_hector_emissions.csv", quote = FALSE, row.names = FALSE)
 
-write_emissions_constraint_file("workflow/data/new_hector_emissions.csv")
+# 9 The whole game -------------------------------------------------------
 
-
-# TODO write a function that can automate this
-## Editing ini file
-
-# readLines of the old emissions path (ini file)
-old_emissions_ini <- readLines("workflow/data/hector_ssp119.ini")
-
-# substitute emissions path in old ini with new emissions path
-new_emissions_ini <- gsub("csv:tables/ssp119_emiss-constraints_rf\\.csv", 
-                          "csv:workflow/data/new_emissions_constraint.csv", 
-                          old_emissions_ini)
-
-new_emissions_ini <- gsub("ssp119", 
-                          "new_emissions",
-                          new_emissions_ini)
-
-# write lines for the new emissions ini
-writeLines(new_emissions_ini, "workflow/data/new_emissions_constraint.ini")
-
+write_emissions_input <- function(gcam_data,
+                                  old_emissions_constraint,
+                                  new_name = "gcam_emissions",
+                                  directory) {
+  
+  # get emissions for hector format
+  hector_emissions <- get_hector_emissions("workflow/data/gcam_emissions.dat")
+  
+  # get luc emissions for hector format
+  hector_luc_emissions <- get_luc_emissions("workflow/data/gcam_emissions.dat")
+  
+  # full emissions for hector
+  full_hector_emissions <- rbind(hector_emissions, hector_luc_emissions)
+  
+  # format emissions constraints
+  emissions_constraints <- get_emissions_constraints(full_hector_emissions)
+  
+  # write .csv of emissions constraints
+  hector_emissions_file <- file.path(directory, paste0(new_name, "_noheader.csv"))
+  write.csv(emissions_constraints, hector_emissions_file, row.names = F, quote = F)
+  
+  # write new gcam emissions constraint .csv with header
+  write_emissions_constraint_file(hector_emissions_path = hector_emissions_file,
+                                  old_emissions_constraint = old_emissions_constraint,
+                                  new_name = new_name,
+                                  directory = directory)
+  # access new gcam_emissions_constraint file
+  gcam_emissions_file <- file.path(directory, paste0(new_name, ".csv"))
+  
+  # write new gcam emissions constrain .ini file
+  write_input_file(emissions_constraint_file = gcam_emissions_file,
+                   new_name = new_name,
+                   directory = directory)
+  
+}
 
