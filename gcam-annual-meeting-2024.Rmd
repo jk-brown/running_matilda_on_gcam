@@ -1,0 +1,288 @@
+---
+title: "GCAM Annual Meeting 2024"
+author: "Joe Brown"
+date: "2024-05-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Goal
+
+**The goal of this markdown is to use the functions written to go from GCAM to Matilda.**
+
+For this the following needs completed:
+
+1. Source the functions in `utils.R`.
+
+2. Use the `gcam_emissions.dat` file to run the GCAM scenario in matilda.
+
+3. Produce a second Matilda ensemble using `SSP1-1.9` to compare with the GCAM scenario.
+
+4. Produce a figure comparing the two scenarios.
+
+**To complete the goals, I think the best workflow will be:**
+
+1. Convert GCAM scenario to a Hector/matilda .ini file. 
+
+2. Create a list of "scenarios" to run Matilda on.
+
+3. Use `parLapply()` to run ~5000 parameter sets.
+
+4. Constrain ensemble - filter out by RMSE and weight by multiple criterion. 
+
+5. Plot median `global_tas` with weighted CI (5-95%) for each scenario.
+
+6. Use different color for each scenario with historic simulation as black
+
+7. Add historic data as dots.
+
+
+## Load libraries and Source functions
+
+```{r, eval= FALSE, message=FALSE}
+
+# remotes::install_github("jgcri/matilda", ref = "dev", force = T)
+library(parallel)
+source("workflow/utils.R")
+library(spatstat)
+
+```
+
+## Get GCAM emissions input file
+
+```{r, eval = FALSE, message=FALSE}
+
+write_emissions_input(gcam_data = "workflow/data/gcam_emissions.dat",
+                      old_emissions_constraint = "workflow/data/ssp119_emiss-constraints_rf.csv",
+                      directory = "workflow/data")
+
+```
+## Use Matilda to run ensembles for new GCAM emissions scenario and comparable SSP
+
+Build an .ini list. Here we will simply use the input files in the project directory: 
+```{r, eval = FALSE}
+
+# identify the directory for gcam emissions
+gcam_dir <- paste0("workflow/data", "/")
+
+# identify directory for ssp scenario
+ssp_dir <- paste0(system.file("input", package = "hector"), "/")
+
+# add input files to a list 
+ini_list <- list(ssp119 = paste0(ssp_dir, "hector_ssp119.ini"),
+                 gcam_emissions = paste0(gcam_dir, "gcam_emissions.ini"))
+
+```
+
+Build new perturbed parameter set:
+```{r, eval=FALSE}
+
+# set seed for replication
+set.seed(245)
+
+# set sample size for param generation
+n = 5000
+
+# initiate a core for parameter generation -- here using the SSP scenario in the ini list
+params_core <- newcore(ini_list[[1]])
+
+# generate parameter set
+params <- generate_params(core = params_core,
+                          draws = n)
+
+```
+
+Splitting jobs and running Matilda:
+
+```{r, eval=FALSE}
+
+# split jobs into parameter chunks
+param_chunks <- split(params, 1:100)
+
+# initiate a cluster
+cl <- makeCluster(detectCores() - 1)
+
+# export functions and objects to the core
+clusterExport(cl, c("param_chunks",
+                   "ini_list",
+                   "newcore",
+                   "iterate_model"))
+
+# run the model 
+time_start = proc.time()
+m_result <- parLapply(cl, names(ini_list), function(scenario_name){
+  
+  # extract scenario information 
+  scenario <- ini_list[[scenario_name]]
+  
+  # initialize a model core for the current scenario
+  core <- newcore(scenario, name = scenario_name)
+  
+  # run the model looking across param_chunks 
+  result_list <- lapply(param_chunks, function(chunk) {
+    
+    iterate_model(core = core, 
+                  params = chunk,
+                  save_years = 1750:2100,
+                  save_vars = c("gmst",
+                                "CO2_concentration",
+                                "global_tas",
+                                "ocean_uptake"))
+  })
+  
+  # Convert run_number to continuous among chunks 
+  for (i in 2:length(result_list)) {
+    
+    # calculate the max run_number of the previous element in result_list
+    max_run_number <- max(result_list[[i-1]]$run_number)
+    
+    # Add the max run_number of the previous element to the run_number of the current element
+    result_list[[i]]$run_number <- result_list[[i]]$run_number + max_run_number
+    
+  }
+  
+  return(result_list)
+  
+})
+time_end = proc.time() - time_start
+
+saveRDS(m_result, "workflow/results/m_result.rds")
+```
+
+Binding together the results that were split.
+
+```{r, eval=FALSE}
+bind_results <- lapply(m_result, function(list){
+  
+  do.call(rbind,  list)
+  
+  })
+```
+
+Adding names to the new list
+
+```{r, eval=FALSE}
+names(bind_results) <- c("ssp119", "gcam")
+```
+
+Scoring runs. Loop through results to compute model weights
+
+```{r, eval=FALSE}
+score_list <- lapply(bind_results, function(df) {
+  
+  scores_temp <- score_runs(df, 
+                            criterion_gmst_obs(),
+                            score_bayesian)
+  scores_temp <- na.omit(scores_temp)
+  
+  scores_co2 <- score_runs(df, 
+                           criterion_co2_obs(),
+                           score_bayesian)
+  scores_co2 <- na.omit(scores_co2)
+  
+  score_list = list(scores_temp, scores_co2)
+  
+  mc_scores <- multi_criteria_weighting(score_list, criterion_weights = c(7.0, 3.0))
+  
+  return(mc_scores)
+})
+```
+
+Merge the scores with results and bind together
+
+```{r, eval=FALSE}
+score_result_list <- Map(merge, bind_results, score_list, by = "run_number")
+
+
+score0result_df <- do.call(rbind, score_result_list) 
+
+# filter out models with a weight > 1e-6
+score0result_df <- subset(score0result_df, mc_weight > 1.0e-06)
+```
+
+Computing median and confidence to plot trajectories:
+```{r, eval=FALSE}
+global_tas_subset <- subset(score0result_df, variable == GLOBAL_TAS()&
+                              year > 2023 &
+                              year < 2101)
+
+plot_data <- global_tas_subset %>% 
+  group_by(scenario, year) %>% 
+  summarize(
+    median = weighted.quantile(value, w = mc_weight, probs = 0.5),
+    lower_ci = weighted.quantile(value, w = mc_weight, probs = 0.05),
+    upper_ci = weighted.quantile(value, w = mc_weight, probs = 0.95)) %>% 
+  ungroup()
+
+plot_data$scenario <- as.factor(plot_data$scenario)
+```
+
+Plot the data:
+```{r, eval=FALSE}
+colors <- c("#6FB2C1", "#F11B00")
+
+projection_plot <- 
+  ggplot(data = plot_data) +
+  geom_line(
+    aes(x = year, 
+        y = median, 
+        color = scenario), 
+    linewidth = 0.7) +
+  geom_ribbon(
+    aes(x = year, 
+        ymin = lower_ci,
+        ymax = upper_ci, 
+        fill = scenario), alpha = 0.2) +
+  labs(title = "Median GSAT",
+       x = "Year",
+       y = "Temperature Anomaly (\u00B0C)") +
+  scale_color_manual(values = colors, name = "Scenario", labels = c("GCAM Emissions", "SSP1-1.9")) +
+  scale_fill_manual(values = colors, name = NULL, guide = "none") +
+  theme_light(base_size = 35)
+projection_plot
+```
+
+```{r, eval=FALSE}
+historic_tas_subset <- subset(score0result_df, variable == GLOBAL_TAS()&
+                              year > 1948 &
+                              year < 2025)
+
+historic_plot_data <- historic_tas_subset %>% 
+  group_by(scenario, year) %>% 
+  summarize(
+    median = weighted.quantile(value, w = mc_weight, probs = 0.5),
+    lower_ci = weighted.quantile(value, w = mc_weight, probs = 0.05),
+    upper_ci = weighted.quantile(value, w = mc_weight, probs = 0.95)) %>% 
+  ungroup()
+```
+
+```{r, eval=FALSE}
+projection_plot +
+  geom_line(data = historic_plot_data,
+            aes(x = year, 
+                y = median),
+            color = "black", 
+            linewidth = 0.7) +
+  geom_ribbon(data = historic_plot_data,
+              aes(x = year, 
+                  ymin = lower_ci,
+                  ymax = upper_ci), 
+              fill = "black",
+              alpha = 0.2) +
+  geom_point(data = matilda:::adjusted_gmst_data,
+             aes(x = year, y = anomaly_C), 
+             color = "black")
+
+```
+```{r, eval=FALSE}
+ggsave("workflow/results/fig_1.png",
+       device = "png", 
+       width = 16, 
+       height = 12,
+       unit = "in", 
+       dpi = 300)
+```
+
